@@ -5,6 +5,12 @@ const formatter = new Intl.NumberFormat("en-US", {
 });
 
 const publicShareUrl = "https://project-fgt3r.vercel.app";
+const krakenTickerUrl = "https://api.kraken.com/0/public/Ticker?pair=";
+const krakenAssetPairsUrl = "https://api.kraken.com/0/public/AssetPairs";
+const krakenDogPair = "DOGUSD";
+const krakenBtcPair = "XBTUSD";
+const livePricesCacheKey = "hopiumCalculatorKrakenLivePrices";
+const livePricesRefreshMs = 5 * 60 * 1000;
 
 const priceFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -42,6 +48,13 @@ const els = {
   copyResults: document.querySelector("#copyResults"),
   shareCalculator: document.querySelector("#shareCalculator"),
   copyMessage: document.querySelector("#copyMessage"),
+  dogPrice: document.querySelector("#dogPrice"),
+  dogChange: document.querySelector("#dogChange"),
+  btcPrice: document.querySelector("#btcPrice"),
+  btcChange: document.querySelector("#btcChange"),
+  pricesUpdated: document.querySelector("#pricesUpdated"),
+  pricesStatus: document.querySelector("#pricesStatus"),
+  refreshPrices: document.querySelector("#refreshPrices"),
   canvas: document.querySelector("#projectionChart"),
 };
 
@@ -49,6 +62,7 @@ let mode = "gain";
 let theme = "dark";
 let settingsOpen = false;
 let messageTimer;
+let livePricesTimer;
 
 function asNumber(value) {
   const parsed = Number(value);
@@ -57,6 +71,242 @@ function asNumber(value) {
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
+}
+
+function readLivePricesCache() {
+  try {
+    const saved = localStorage.getItem(livePricesCacheKey);
+    return saved ? JSON.parse(saved) : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function writeLivePricesCache(data) {
+  try {
+    localStorage.setItem(
+      livePricesCacheKey,
+      JSON.stringify({
+        savedAt: Date.now(),
+        data,
+      }),
+    );
+  } catch (error) {
+    // If storage is unavailable, live prices still work for the current page load.
+  }
+}
+
+function isFreshCache(cache) {
+  return Boolean(cache && cache.data && Date.now() - cache.savedAt < livePricesRefreshMs);
+}
+
+function formatDogPrice(value) {
+  if (!Number.isFinite(value)) {
+    return "Unavailable";
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: value >= 1 ? 2 : 8,
+    maximumFractionDigits: value >= 1 ? 4 : 10,
+  }).format(value);
+}
+
+function formatBtcPrice(value) {
+  if (!Number.isFinite(value)) {
+    return "Unavailable";
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function getKrakenLastPrice(ticker) {
+  const price = Number(ticker?.c?.[0]);
+  return Number.isFinite(price) ? price : null;
+}
+
+function getKrakenChangePercent(ticker) {
+  const current = Number(ticker?.c?.[0]);
+  const open = Number(ticker?.o);
+  if (!Number.isFinite(current) || !Number.isFinite(open) || open === 0) {
+    return null;
+  }
+
+  return ((current - open) / open) * 100;
+}
+
+function findTickerByRequestedPair(result, requestedPair) {
+  if (!result) {
+    return null;
+  }
+
+  if (result[requestedPair]) {
+    return result[requestedPair];
+  }
+
+  if (requestedPair === krakenBtcPair && result.XXBTZUSD) {
+    return result.XXBTZUSD;
+  }
+
+  if (requestedPair !== krakenBtcPair) {
+    const dogEntry = Object.entries(result).find(([pairName]) => pairName !== "XXBTZUSD");
+    return dogEntry?.[1] || null;
+  }
+
+  return null;
+}
+
+function makeKrakenTickerUrl(pairs) {
+  return `${krakenTickerUrl}${encodeURIComponent(pairs.join(","))}`;
+}
+
+async function fetchKrakenJson(url) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error("Kraken request failed");
+  }
+
+  const data = await response.json();
+  if (data.error?.length) {
+    throw new Error(data.error.join(", "));
+  }
+
+  return data.result || {};
+}
+
+async function findDogUsdPair() {
+  const pairs = await fetchKrakenJson(krakenAssetPairsUrl);
+  const entries = Object.entries(pairs);
+  const match = entries.find(([, pair]) => {
+    const altname = pair.altname || "";
+    const wsname = pair.wsname || "";
+    return altname === krakenDogPair || wsname === "DOG/USD";
+  });
+
+  return match?.[1]?.altname || match?.[0] || null;
+}
+
+async function fetchKrakenPrices() {
+  const fetchedAt = Date.now();
+
+  try {
+    const result = await fetchKrakenJson(makeKrakenTickerUrl([krakenDogPair, krakenBtcPair]));
+    const dogTicker = findTickerByRequestedPair(result, krakenDogPair);
+    const btcTicker = findTickerByRequestedPair(result, krakenBtcPair);
+    const dogPrice = getKrakenLastPrice(dogTicker);
+    const btcPrice = getKrakenLastPrice(btcTicker);
+
+    return {
+      dogPair: krakenDogPair,
+      btcPair: krakenBtcPair,
+      dogPrice,
+      btcPrice,
+      dogChange: getKrakenChangePercent(dogTicker),
+      btcChange: getKrakenChangePercent(btcTicker),
+      fetchedAt,
+    };
+  } catch (error) {
+    const foundDogPair = await findDogUsdPair();
+    const fallbackPairs = foundDogPair ? [foundDogPair, krakenBtcPair] : [krakenBtcPair];
+    const result = await fetchKrakenJson(makeKrakenTickerUrl(fallbackPairs));
+    const dogTicker = foundDogPair ? findTickerByRequestedPair(result, foundDogPair) : null;
+    const btcTicker = findTickerByRequestedPair(result, krakenBtcPair);
+
+    return {
+      dogPair: foundDogPair || krakenDogPair,
+      btcPair: krakenBtcPair,
+      dogPrice: getKrakenLastPrice(dogTicker),
+      btcPrice: getKrakenLastPrice(btcTicker),
+      dogChange: getKrakenChangePercent(dogTicker),
+      btcChange: getKrakenChangePercent(btcTicker),
+      fetchedAt,
+    };
+  }
+}
+
+function formatTickerChange(value) {
+  if (!Number.isFinite(value)) {
+    return "24h unavailable";
+  }
+
+  const sign = value >= 0 ? "+" : "";
+  return `${sign}${value.toFixed(2)}%`;
+}
+
+function setChangeClass(element, value) {
+  element.classList.toggle("positive", Number.isFinite(value) && value >= 0);
+  element.classList.toggle("negative", Number.isFinite(value) && value < 0);
+}
+
+function renderLivePrices(data, statusText) {
+  const hasDog = Number.isFinite(data?.dogPrice);
+  const hasBtc = Number.isFinite(data?.btcPrice);
+
+  els.dogPrice.textContent = hasDog ? formatDogPrice(data.dogPrice) : "DOG unavailable";
+  els.btcPrice.textContent = hasBtc ? formatBtcPrice(data.btcPrice) : "BTC unavailable";
+  els.dogChange.textContent = hasDog ? formatTickerChange(data.dogChange) : "DOG unavailable";
+  els.btcChange.textContent = hasBtc ? formatTickerChange(data.btcChange) : "BTC unavailable";
+  setChangeClass(els.dogChange, data?.dogChange);
+  setChangeClass(els.btcChange, data?.btcChange);
+  els.pricesUpdated.textContent = data?.fetchedAt
+    ? new Date(data.fetchedAt).toLocaleString()
+    : "Unavailable";
+  els.pricesStatus.textContent =
+    hasDog || hasBtc ? statusText : "Unavailable";
+}
+
+function renderLivePricesError(message) {
+  els.dogPrice.textContent = "DOG unavailable";
+  els.btcPrice.textContent = "BTC unavailable";
+  els.dogChange.textContent = "DOG unavailable";
+  els.btcChange.textContent = "BTC unavailable";
+  els.dogChange.classList.remove("positive", "negative");
+  els.btcChange.classList.remove("positive", "negative");
+  els.pricesUpdated.textContent = "Unavailable";
+  els.pricesStatus.textContent = message;
+}
+
+async function loadLivePrices() {
+  const cache = readLivePricesCache();
+
+  if (isFreshCache(cache)) {
+    renderLivePrices(cache.data, "Cached");
+    return;
+  }
+
+  els.pricesStatus.textContent = "Refreshing...";
+
+  try {
+    const data = await fetchKrakenPrices();
+    if (!Number.isFinite(data.dogPrice) && !Number.isFinite(data.btcPrice)) {
+      throw new Error("No Kraken prices returned");
+    }
+
+    writeLivePricesCache(data);
+    renderLivePrices(data, "Live");
+  } catch (error) {
+    if (cache?.data) {
+      renderLivePrices(cache.data, "Cached");
+      return;
+    }
+
+    renderLivePricesError("Live prices unavailable right now.");
+  }
+}
+
+function startLivePricesTimer() {
+  window.clearInterval(livePricesTimer);
+  if (document.hidden) {
+    return;
+  }
+
+  livePricesTimer = window.setInterval(loadLivePrices, livePricesRefreshMs);
 }
 
 function setMode(nextMode) {
@@ -370,6 +620,10 @@ els.shareCalculator.addEventListener("click", () => {
   copyText(publicShareUrl, "Link copied.");
 });
 
+els.refreshPrices.addEventListener("click", () => {
+  loadLivePrices();
+});
+
 [els.token, els.amount, els.averageCost, els.gainPercent, els.lossPercent].forEach((input) => {
   input.addEventListener("input", () => {
     if (input === els.gainPercent && mode === "gain") {
@@ -385,4 +639,16 @@ els.shareCalculator.addEventListener("click", () => {
 });
 
 window.addEventListener("resize", render);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    window.clearInterval(livePricesTimer);
+    return;
+  }
+
+  loadLivePrices();
+  startLivePricesTimer();
+});
+
 render();
+loadLivePrices();
+startLivePricesTimer();

@@ -54,6 +54,26 @@
           </div>
         </header>
 
+        <section class="market-ticker" aria-label="Live DOG and BTC prices">
+          <div class="ticker-assets">
+            <article class="ticker-pill">
+              <span class="ticker-symbol">$DOG</span>
+              <strong id="dogPrice">Loading...</strong>
+              <small id="dogChange">DOG/USD</small>
+            </article>
+            <article class="ticker-pill">
+              <span class="ticker-symbol">BTC</span>
+              <strong id="btcPrice">Loading...</strong>
+              <small id="btcChange">BTC/USD</small>
+            </article>
+          </div>
+          <div class="ticker-meta">
+            <small>Updated <span id="pricesUpdated">checking...</span></small>
+            <small id="pricesStatus"></small>
+            <button type="button" id="refreshPrices" aria-label="Refresh live prices">Refresh</button>
+          </div>
+        </section>
+
         <section class="tool-grid" aria-label="Target planning calculator">
           <form class="control-panel" id="plannerForm">
             <div class="field-row two">
