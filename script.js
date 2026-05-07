@@ -4,6 +4,8 @@ const formatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 2,
 });
 
+const publicShareUrl = "https://project-fgt3r.vercel.app";
+
 const priceFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
@@ -64,7 +66,7 @@ function setMode(nextMode) {
   els.lossTab.classList.toggle("active", !isGain);
   els.gainTab.setAttribute("aria-pressed", String(isGain));
   els.lossTab.setAttribute("aria-pressed", String(!isGain));
-  els.slider.max = isGain ? "10000" : "100";
+  els.slider.max = isGain ? "5000" : "100";
   els.slider.value = isGain ? els.gainPercent.value : els.lossPercent.value;
   render();
 }
@@ -365,7 +367,7 @@ els.copyResults.addEventListener("click", () => {
 });
 
 els.shareCalculator.addEventListener("click", () => {
-  copyText(window.location.href, "Link copied.");
+  copyText(publicShareUrl, "Link copied.");
 });
 
 [els.token, els.amount, els.averageCost, els.gainPercent, els.lossPercent].forEach((input) => {
