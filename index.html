@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Hopium Calculator is a Bitcoin DOG themed price target and profit scenario planner."
+    />
+    <title>Hopium Calculator</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="workspace">
+        <header class="topbar">
+          <div class="brand-block">
+            <img
+              class="brand-logo"
+              src="public/assets/dog-hoodie.jpg"
+              alt="Dog in orange Bitcoin hoodie"
+            />
+            <div>
+              <p class="eyebrow">DOG GO TO THE MOON</p>
+              <h1>Hopium Calculator</h1>
+            </div>
+          </div>
+          <div class="top-actions">
+            <div class="summary-pill" aria-live="polite">
+              <span id="tokenLabel">$DOG</span>
+              <strong id="positionValue">$0.00</strong>
+            </div>
+            <button
+              class="menu-button"
+              type="button"
+              id="settingsButton"
+              aria-label="Open settings"
+              aria-expanded="false"
+            >
+              <span></span>
+              <span></span>
+              <span></span>
+            </button>
+            <div class="settings-menu" id="settingsMenu" hidden>
+              <div class="settings-title">Settings</div>
+              <button class="theme-toggle" type="button" id="themeToggle" aria-pressed="false">
+                <span>
+                  <strong>Theme</strong>
+                  <small id="themeLabel">Dark mode</small>
+                </span>
+                <span class="toggle-track" aria-hidden="true"><span class="toggle-dot"></span></span>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <section class="tool-grid" aria-label="Target planning calculator">
+          <form class="control-panel" id="plannerForm">
+            <div class="field-row two">
+              <label>
+                <span>Token</span>
+                <input id="token" type="text" value="$DOG" autocomplete="off" />
+              </label>
+              <label>
+                <span>Amount held</span>
+                <input id="amount" type="number" min="0" step="any" value="100000" />
+              </label>
+            </div>
+
+            <label>
+              <span>Average cost</span>
+              <input id="averageCost" type="number" min="0" step="0.00000001" value="0.0042" />
+            </label>
+
+            <div class="target-tabs" role="tablist" aria-label="Scenario type">
+              <button class="tab active" type="button" id="gainTab" aria-pressed="true">Gain</button>
+              <button class="tab" type="button" id="lossTab" aria-pressed="false">Loss</button>
+            </div>
+
+            <div class="field-row two">
+              <label>
+                <span>Gain target</span>
+                <div class="input-suffix">
+                  <input id="gainPercent" type="number" min="0" step="1" value="100" />
+                  <span>%</span>
+                </div>
+              </label>
+              <label>
+                <span>Loss target</span>
+                <div class="input-suffix">
+                  <input id="lossPercent" type="number" min="0" max="100" step="1" value="50" />
+                  <span>%</span>
+                </div>
+              </label>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-heading">
+                <span id="sliderLabel">Gain target</span>
+                <strong id="sliderValue">100%</strong>
+              </div>
+              <input id="targetSlider" type="range" min="0" max="10000" step="1" value="100" />
+            </div>
+          </form>
+
+          <section class="chart-panel" aria-label="Projected price path">
+            <div class="chart-header">
+              <div>
+                <p class="eyebrow">Projected target</p>
+                <h2 id="targetPrice">$0.00000000</h2>
+              </div>
+              <div class="scenario-badge gain" id="scenarioBadge">Gain scenario</div>
+            </div>
+            <div class="chart-wrap">
+              <canvas id="projectionChart" width="900" height="480" aria-label="Projection chart"></canvas>
+            </div>
+          </section>
+        </section>
+
+        <section class="metrics-grid" aria-label="Scenario results">
+          <article>
+            <span>Cost basis</span>
+            <strong id="costBasis">$0.00</strong>
+          </article>
+          <article>
+            <span>Target value</span>
+            <strong id="targetValue">$0.00</strong>
+          </article>
+          <article>
+            <span id="profitLossLabel">Potential profit</span>
+            <strong id="profitLoss">$0.00</strong>
+          </article>
+          <article>
+            <span>Break-even price</span>
+            <strong id="breakEven">$0.00000000</strong>
+          </article>
+          <article>
+            <span>Hopium Rating</span>
+            <strong id="hopiumRating">Mild Hopium</strong>
+          </article>
+        </section>
+
+        <section class="action-panel" aria-label="Share and copy results">
+          <div>
+            <p class="eyebrow">For fun</p>
+            <h2>Share the hopium, not financial advice.</h2>
+          </div>
+          <div class="action-buttons">
+            <button type="button" id="copyResults">Copy Results</button>
+            <button type="button" id="shareCalculator">Share this calculator</button>
+          </div>
+          <p class="copy-message" id="copyMessage" aria-live="polite"></p>
+        </section>
+
+        <section class="portfolio-note">
+          <div>
+            <p class="eyebrow">Next build</p>
+            <h2>Portfolio tracking comes after the planner feels right.</h2>
+          </div>
+          <p>
+            The second layer can add saved positions, wallet imports, manual holdings, alerts,
+            and a clean Apple-friendly view for assets that apps like AssetDash no longer cover.
+          </p>
+        </section>
+
+        <p class="disclaimer">
+          Hopium Calculator is for entertainment and planning purposes only. It does not provide
+          financial advice, investment advice, or guaranteed price predictions.
+        </p>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
